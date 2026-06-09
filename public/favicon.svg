@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbe18a"/>
+      <stop offset="100%" stop-color="#b07020"/>
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="14" fill="#1a0f0c"/>
+  <g transform="translate(0,8)">
+    <rect x="20" y="20" width="40" height="32" fill="url(#g)" stroke="#7a5012" stroke-width="2"/>
+    <rect x="20" y="14" width="6" height="6" fill="url(#g)" stroke="#7a5012" stroke-width="2"/>
+    <rect x="30" y="14" width="6" height="6" fill="url(#g)" stroke="#7a5012" stroke-width="2"/>
+    <rect x="44" y="14" width="6" height="6" fill="url(#g)" stroke="#7a5012" stroke-width="2"/>
+    <rect x="54" y="14" width="6" height="6" fill="url(#g)" stroke="#7a5012" stroke-width="2"/>
+    <rect x="10" y="10" width="12" height="42" fill="url(#g)" stroke="#7a5012" stroke-width="2"/>
+    <rect x="58" y="10" width="12" height="42" fill="url(#g)" stroke="#7a5012" stroke-width="2"/>
+    <polygon points="10,10 16,2 22,10" fill="#c8311a" stroke="#7a5012" stroke-width="2"/>
+    <polygon points="58,10 64,2 70,10" fill="#c8311a" stroke="#7a5012" stroke-width="2"/>
+    <path d="M 34 52 L 34 38 Q 40 32 46 38 L 46 52 Z" fill="#3a2210" stroke="#7a5012" stroke-width="2"/>
+  </g>
+</svg>
