@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   Star, Shield, Sword, Trophy, Plus, Trash2, ChevronLeft, ChevronRight,
   Crown, Users, Calendar, Medal, Flame, Zap, AlertTriangle, X, Sparkles,
-  Loader2, CloudOff, GripVertical,
+  Loader2, CloudOff, GripVertical, Lock, Unlock, Eye,
 } from 'lucide-react';
 import * as api from './api.js';
 
@@ -194,10 +194,19 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [tripleBurst, setTripleBurst] = useState(null);
   const [dragIndex, setDragIndex] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [pinError, setPinError] = useState('');
 
   const dragIndexRef = useRef(null);
   const participantsRef = useRef(participants);
   useEffect(() => { participantsRef.current = participants; }, [participants]);
+
+  // Restore session
+  useEffect(() => {
+    const saved = api.loadPin();
+    if (saved) setIsAdmin(true);
+  }, []);
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -288,6 +297,23 @@ export default function App() {
   const triggerTriple = (key) => {
     setTripleBurst(key);
     setTimeout(() => setTripleBurst(null), 700);
+  };
+
+  const handleLogin = async (pin) => {
+    try {
+      await api.auth(pin);
+      api.setPin(pin);
+      setIsAdmin(true);
+      setPinModalOpen(false);
+      setPinError('');
+    } catch (e) {
+      setPinError('PIN incorrecto, intenta de nuevo');
+    }
+  };
+
+  const handleLogout = () => {
+    api.clearPin();
+    setIsAdmin(false);
   };
 
   const resetAll = async () => {
@@ -517,14 +543,37 @@ export default function App() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => setConfirmReset(true)}
-              disabled={participants.length === 0}
-              className="text-xs uppercase tracking-widest text-stone-500 hover:text-red-400 disabled:opacity-30 transition-colors flex items-center gap-1.5 border border-stone-700 hover:border-red-900 px-3 py-2 rounded"
-            >
-              <Flame size={12} />
-              Reiniciar liga
-            </button>
+            <div className="flex items-center gap-2">
+              {isAdmin ? (
+                <button
+                  onClick={handleLogout}
+                  className="text-xs uppercase tracking-widest text-amber-400 hover:text-amber-200 transition-colors flex items-center gap-1.5 border border-amber-700/50 hover:border-amber-500 px-3 py-2 rounded"
+                  title="Salir del modo edición"
+                >
+                  <Unlock size={12} />
+                  <span className="hidden sm:inline">Editor</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setPinError(''); setPinModalOpen(true); }}
+                  className="text-xs uppercase tracking-widest text-stone-500 hover:text-amber-400 transition-colors flex items-center gap-1.5 border border-stone-700 hover:border-amber-700 px-3 py-2 rounded"
+                  title="Entrar al modo edición"
+                >
+                  <Lock size={12} />
+                  <span className="hidden sm:inline">Espectador</span>
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => setConfirmReset(true)}
+                  disabled={participants.length === 0}
+                  className="text-xs uppercase tracking-widest text-stone-500 hover:text-red-400 disabled:opacity-30 transition-colors flex items-center gap-1.5 border border-stone-700 hover:border-red-900 px-3 py-2 rounded"
+                >
+                  <Flame size={12} />
+                  <span className="hidden sm:inline">Reiniciar</span>
+                </button>
+              )}
+            </div>
           </div>
         </header>
 
@@ -563,11 +612,23 @@ export default function App() {
         {/* ---- Roster view ---- */}
         {view === 'roster' && (
           <section key="roster" className="cwl-fade-up">
+            {!isAdmin && (
+              <div className="flex items-center gap-2 text-stone-500 text-xs border border-stone-800 rounded-lg px-4 py-3 mb-4"
+                style={{ background: 'rgba(20,10,8,0.5)', backdropFilter: 'blur(4px)' }}>
+                <Eye size={13} />
+                Modo espectador — ingresa el PIN para editar
+                <button onClick={() => { setPinError(''); setPinModalOpen(true); }}
+                  className="ml-auto text-amber-500 hover:text-amber-300 transition-colors flex items-center gap-1">
+                  <Lock size={12} /> Entrar
+                </button>
+              </div>
+            )}
             <div
               className="rounded-xl border border-amber-900/40 p-4 sm:p-5 mb-6 relative overflow-hidden"
               style={{
                 background: 'linear-gradient(180deg, rgba(50,26,16,0.75) 0%, rgba(20,10,8,0.8) 100%)',
                 backdropFilter: 'blur(8px)',
+                display: isAdmin ? 'block' : 'none',
               }}
             >
               <div className="absolute -top-5 -right-5 opacity-[0.07] pointer-events-none">
@@ -614,30 +675,33 @@ export default function App() {
             ) : (
               <div className="grid gap-2">
                 <div className="text-xs text-stone-500 uppercase tracking-wider px-2 mb-1 flex items-center gap-2">
-                  <GripVertical size={12} className="opacity-50" />
-                  {participants.length} {participants.length === 1 ? 'participante' : 'participantes'} · arrastra para reordenar
+                  {isAdmin && <GripVertical size={12} className="opacity-50" />}
+                  {participants.length} {participants.length === 1 ? 'participante' : 'participantes'}
+                  {isAdmin && ' · arrastra para reordenar'}
                 </div>
                 {participants.map((p, idx) => (
                   <div
                     key={p.id}
-                    draggable
-                    onDragStart={() => handleDragStart(idx)}
-                    onDragOver={e => handleDragOver(e, idx)}
-                    onDragEnd={handleDragEnd}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-all cwl-fade-up select-none ${
-                      dragIndex === idx ? 'cwl-dragging cwl-drag-target' : 'hover:translate-x-1'
-                    }`}
+                    draggable={isAdmin}
+                    onDragStart={isAdmin ? () => handleDragStart(idx) : undefined}
+                    onDragOver={isAdmin ? e => handleDragOver(e, idx) : undefined}
+                    onDragEnd={isAdmin ? handleDragEnd : undefined}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-all cwl-fade-up ${
+                      isAdmin ? 'select-none' : ''
+                    } ${dragIndex === idx ? 'cwl-dragging cwl-drag-target' : 'hover:translate-x-1'}`}
                     style={{
                       animationDelay: `${idx * 0.03}s`,
                       background: 'linear-gradient(90deg, rgba(40,22,14,0.75) 0%, rgba(20,10,8,0.7) 100%)',
                       borderColor: dragIndex === idx ? '#f5b73a88' : '#2a2421',
                       backdropFilter: 'blur(4px)',
-                      cursor: 'grab',
+                      cursor: isAdmin ? 'grab' : 'default',
                     }}
                   >
-                    <div className="text-stone-600 hover:text-amber-500/60 transition-colors cursor-grab shrink-0">
-                      <GripVertical size={16} />
-                    </div>
+                    {isAdmin && (
+                      <div className="text-stone-600 hover:text-amber-500/60 transition-colors cursor-grab shrink-0">
+                        <GripVertical size={16} />
+                      </div>
+                    )}
                     <div className="text-stone-500 font-bold w-6 text-right shrink-0" style={fontMono}>
                       {String(idx + 1).padStart(2, '0')}
                     </div>
@@ -650,13 +714,15 @@ export default function App() {
                     >
                       TH {p.th}
                     </div>
-                    <button
-                      onClick={() => setConfirmDelete(p)}
-                      className="text-stone-600 hover:text-red-400 transition-colors p-1 shrink-0"
-                      aria-label="Eliminar"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => setConfirmDelete(p)}
+                        className="text-stone-600 hover:text-red-400 transition-colors p-1 shrink-0"
+                        aria-label="Eliminar"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -751,6 +817,7 @@ export default function App() {
                         onDragStart={() => handleDragStart(i)}
                         onDragOver={e => handleDragOver(e, i)}
                         onDragEnd={handleDragEnd}
+                        editable={isAdmin}
                       />
                     );
                   })}
@@ -787,6 +854,17 @@ export default function App() {
         )}
       </div>
 
+      {/* PIN modal */}
+      {pinModalOpen && (
+        <PinModal
+          error={pinError}
+          onSubmit={handleLogin}
+          onClose={() => { setPinModalOpen(false); setPinError(''); }}
+          fontDisplay={fontDisplay}
+          fontMono={fontMono}
+        />
+      )}
+
       {/* Modals */}
       {confirmReset && (
         <Modal onClose={() => setConfirmReset(false)}>
@@ -821,18 +899,18 @@ export default function App() {
 
 // ----------------- subcomponents -----------------
 
-const DayRow = ({ player, day, onChange, onTriple, showBurst, index, isDragging, onDragStart, onDragOver, onDragEnd }) => {
+const DayRow = ({ player, day, onChange, onTriple, showBurst, index, isDragging, onDragStart, onDragOver, onDragEnd, editable = true }) => {
   const fontMono = { fontFamily: "'JetBrains Mono', monospace" };
   const hasData = day.attacked || day.starsLost > 0;
   const isPerfect = day.attackStars === 3;
 
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragEnd={onDragEnd}
-      className={`rounded-lg border transition-all p-3 sm:p-4 relative cwl-fade-up select-none ${
+      draggable={editable}
+      onDragStart={editable ? onDragStart : undefined}
+      onDragOver={editable ? onDragOver : undefined}
+      onDragEnd={editable ? onDragEnd : undefined}
+      className={`rounded-lg border transition-all p-3 sm:p-4 relative cwl-fade-up ${editable ? 'select-none' : ''} ${
         isDragging ? 'cwl-dragging cwl-drag-target' : ''
       }`}
       style={{
@@ -843,7 +921,7 @@ const DayRow = ({ player, day, onChange, onTriple, showBurst, index, isDragging,
         borderColor: isPerfect ? '#f5b73a66' : hasData ? '#7a501266' : '#2a2421',
         boxShadow: isPerfect ? '0 0 22px rgba(245,183,58,0.22)' : 'none',
         backdropFilter: 'blur(5px)',
-        cursor: 'grab',
+        cursor: editable ? 'grab' : 'default',
       }}
     >
       {showBurst && (
@@ -867,9 +945,11 @@ const DayRow = ({ player, day, onChange, onTriple, showBurst, index, isDragging,
 
       <div className="flex flex-wrap items-center gap-3 sm:gap-4">
         {/* Drag handle */}
-        <div className="text-stone-600 cursor-grab shrink-0">
-          <GripVertical size={15} />
-        </div>
+        {editable && (
+          <div className="text-stone-600 cursor-grab shrink-0">
+            <GripVertical size={15} />
+          </div>
+        )}
 
         {/* Player name */}
         <div className="min-w-0 flex-1 sm:flex-initial sm:w-40">
@@ -881,13 +961,13 @@ const DayRow = ({ player, day, onChange, onTriple, showBurst, index, isDragging,
         </div>
 
         {/* Defense FIRST (izquierda) */}
-        <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2 ${!editable ? 'pointer-events-none opacity-70' : ''}`}>
           <Shield size={14} className="text-blue-400/70" />
           <ShieldPicker value={day.starsLost} onChange={(v) => onChange({ starsLost: v })} />
         </div>
 
         {/* Attack SECOND (derecha) */}
-        <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2 ${!editable ? 'pointer-events-none opacity-70' : ''}`}>
           <Sword size={14} className="text-orange-400/70" />
           <StarPicker value={day.attackStars} onChange={(v) => onChange({ attackStars: v })} onTriple={onTriple} />
         </div>
@@ -1003,6 +1083,44 @@ const EmptyState = ({ icon: Icon, title, msg }) => (
     <div className="text-sm text-stone-500">{msg}</div>
   </div>
 );
+
+const PinModal = ({ error, onSubmit, onClose, fontDisplay, fontMono }) => {
+  const [pin, setPin] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)' }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="relative max-w-xs w-full rounded-xl border border-amber-900/40 p-6"
+        style={{ background: 'linear-gradient(180deg, #2a1810 0%, #14090a 100%)', boxShadow: '0 24px 70px rgba(0,0,0,0.85)', animation: 'cwl-fade-up 0.25s ease-out' }}>
+        <button onClick={onClose} className="absolute top-3 right-3 text-stone-500 hover:text-stone-200"><X size={18} /></button>
+        <div className="flex items-center gap-2 text-amber-400 mb-4">
+          <Lock size={22} />
+          <h3 className="text-lg font-bold" style={fontDisplay}>Modo edición</h3>
+        </div>
+        <p className="text-stone-400 text-sm mb-4">Ingresa el PIN para desbloquear la edición.</p>
+        <input
+          type="password"
+          value={pin}
+          onChange={e => setPin(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && pin && onSubmit(pin)}
+          placeholder="PIN"
+          autoFocus
+          className="w-full bg-black/50 border border-stone-700 focus:border-amber-500 focus:outline-none rounded px-3 py-2.5 text-stone-100 placeholder-stone-600 mb-2 text-center tracking-widest text-lg"
+          style={fontMono}
+        />
+        {error && <p className="text-red-400 text-xs mb-3 text-center">{error}</p>}
+        <button
+          onClick={() => pin && onSubmit(pin)}
+          disabled={!pin}
+          className="w-full py-2.5 rounded font-bold uppercase tracking-wider text-sm text-stone-900 disabled:opacity-30 mt-1 transition-transform hover:scale-[1.02] active:scale-95"
+          style={{ ...fontDisplay, background: 'linear-gradient(180deg, #fbe18a 0%, #f5b73a 50%, #c98e2c 100%)', boxShadow: '0 2px 0 #7a5012' }}
+        >
+          Desbloquear
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const Modal = ({ children, onClose }) => (
   <div

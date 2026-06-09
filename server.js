@@ -70,6 +70,24 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Auth middleware — only active if ADMIN_PIN env var is set
+const ADMIN_PIN = process.env.ADMIN_PIN;
+
+const requireAdmin = (req, res, next) => {
+  if (!ADMIN_PIN) return next(); // no PIN configured → open
+  const pin = req.headers['x-admin-pin'];
+  if (pin !== ADMIN_PIN) return res.status(401).json({ error: 'PIN incorrecto' });
+  next();
+};
+
+// POST validate PIN
+app.post('/api/auth', (req, res) => {
+  if (!ADMIN_PIN) return res.json({ ok: true });
+  const { pin } = req.body;
+  if (pin === ADMIN_PIN) return res.json({ ok: true });
+  res.status(401).json({ error: 'PIN incorrecto' });
+});
+
 // GET full state
 app.get('/api/state', (_req, res) => {
   try {
@@ -106,7 +124,7 @@ app.get('/api/state', (_req, res) => {
 });
 
 // POST add participant
-app.post('/api/participants', (req, res) => {
+app.post('/api/participants', requireAdmin, (req, res) => {
   const { id, name, th } = req.body;
   if (!id || !name || !th) {
     return res.status(400).json({ error: 'invalid payload' });
@@ -125,7 +143,7 @@ app.post('/api/participants', (req, res) => {
 });
 
 // DELETE participant
-app.delete('/api/participants/:id', (req, res) => {
+app.delete('/api/participants/:id', requireAdmin, (req, res) => {
   try {
     stmts.deleteParticipant.run(req.params.id);
     res.json({ ok: true });
@@ -136,7 +154,7 @@ app.delete('/api/participants/:id', (req, res) => {
 });
 
 // PUT update day data
-app.put('/api/day-data', (req, res) => {
+app.put('/api/day-data', requireAdmin, (req, res) => {
   const { participantId, day, oppTH, percent, attackStars, starsLost, attacked } = req.body;
   if (!participantId || !day) {
     return res.status(400).json({ error: 'invalid payload' });
@@ -159,7 +177,7 @@ app.put('/api/day-data', (req, res) => {
 });
 
 // PUT reorder participants
-app.put('/api/participants/order', (req, res) => {
+app.put('/api/participants/order', requireAdmin, (req, res) => {
   const { ids } = req.body;
   if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids must be an array' });
   try {
@@ -175,7 +193,7 @@ app.put('/api/participants/order', (req, res) => {
 });
 
 // DELETE all (reset)
-app.delete('/api/state', (_req, res) => {
+app.delete('/api/state', requireAdmin, (_req, res) => {
   try {
     const tx = db.transaction(() => {
       stmts.deleteAllParticipants.run();
